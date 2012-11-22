@@ -28,9 +28,12 @@ checkQueue = () ->
       filePath = path.dirname item.path
       mkdirp.sync "#{conf.dl.incoming}/#{filePath}"
       fd = fs.createWriteStream "#{__dirname}/dl.tar"
+      request.post 'http://localhost:80/jsonrpc',
+        json: xbmcmessage 'ntor downloading: ', path.basename item.path
       grabTar = request.get("#{ntorUrl}/tar?path=#{item.path}").pipe fd
       grabTar.on 'close', () ->
-        console.log "called"
+        request.post 'http://localhost:80/jsonrpc',
+          json: xbmcmessage 'ntor extracting: ', path.basename item.path
         extractTar = spawn "tar", ["xf", "#{__dirname}/dl.tar"], {cwd: conf.dl.incoming}
         extractTar.stdout.on 'data', (data) ->
           console.log data.toString()
@@ -38,9 +41,19 @@ checkQueue = () ->
           console.log data.toString()
         extractTar.on 'exit', (code) ->
           console.error "Tar process failed with code: #{code}" if code > 0
+          request.post 'http://localhost:80/jsonrpc',
+            json: xbmcmessage 'ntor finished!: ', path.basename item.path
           request.post { url: "#{ntorUrl}/removeFromQueue", json: item }, (err, res, body ) ->
             console.log "Removed #{item.path} from queue"
             lock = false
+
+xbmcmessage = (title, message) ->
+  id: '1'
+  jsonrpc: '2.0'
+  method: 'GUI.ShowNotification'
+  params:
+    title: title
+    message: message
 
 checkQueue()
 

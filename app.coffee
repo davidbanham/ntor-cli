@@ -7,18 +7,21 @@ fs = require 'fs'
 mkdirp = require 'mkdirp'
 tar = require 'tar'
 spawn = require('child_process').spawn
+lock = false
 
 ntorUrl = "https://#{encodeURIComponent conf.ntor.username}:#{encodeURIComponent conf.ntor.password}@#{conf.ntor.domain}"
 
 console.log "Ntor client started"
 
 checkQueue = () ->
+  return if lock
+  lock = true
   request "#{ntorUrl}/showQueue", (err, res, body) ->
     queue = JSON.parse body
     for item in queue
       target = item if item.claimed == false
       break
-    return delay checkQueue() if !target?
+    return lock = false if !target?
     console.log "Target is #{target.path}"
     target.claimed = true
     request.post { url: "#{ntorUrl}/claimItem", json: target }, (err, res, item) ->
@@ -37,8 +40,8 @@ checkQueue = () ->
           console.error "Tar process failed with code: #{code}" if code > 0
           request.post { url: "#{ntorUrl}/removeFromQueue", json: item }, (err, res, body ) ->
             console.log "Removed #{item.path} from queue"
-            delay checkQueue()
+            lock = false
 
 checkQueue()
 
-delay = (ms, func) -> setTimeout func, ms || 15*1000
+setInterval checkQueue, 15*1000

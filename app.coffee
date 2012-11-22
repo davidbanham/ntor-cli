@@ -6,8 +6,11 @@ path = require 'path'
 fs = require 'fs'
 mkdirp = require 'mkdirp'
 tar = require 'tar'
+spawn = require('child_process').spawn
 
 ntorUrl = "https://#{encodeURIComponent conf.ntor.username}:#{encodeURIComponent conf.ntor.password}@#{conf.ntor.domain}"
+
+console.log "Ntor client started"
 
 checkQueue = () ->
   request "#{ntorUrl}/showQueue", (err, res, body) ->
@@ -21,11 +24,20 @@ checkQueue = () ->
     request.post { url: "#{ntorUrl}/claimItem", json: target }, (err, res, item) ->
       filePath = path.dirname item.path
       mkdirp.sync "#{conf.dl.incoming}/#{filePath}"
-      grabTar = request.get("#{ntorUrl}/tar?path=#{item.path}").pipe tar.Extract {path: "#{conf.dl.incoming}"}
+      fd = fs.createWriteStream "#{__dirname}/dl.tar"
+      grabTar = request.get("#{ntorUrl}/tar?path=#{item.path}").pipe fd
       grabTar.on 'close', () ->
-        request.post { url: "#{ntorUrl}/removeFromQueue", json: item }, (err, res, body ) ->
-          console.log "Removed #{item.path} from queue"
-          delay checkQueue()
+        console.log "called"
+        extractTar = spawn "tar", ["xf", "#{__dirname}/dl.tar"], {cwd: conf.dl.incoming}
+        extractTar.stdout.on 'data', (data) ->
+          console.log data.toString()
+        extractTar.stderr.on 'data', (data) ->
+          console.log data.toString()
+        extractTar.on 'exit', (code) ->
+          console.error "Tar process failed with code: #{code}" if code > 0
+          request.post { url: "#{ntorUrl}/removeFromQueue", json: item }, (err, res, body ) ->
+            console.log "Removed #{item.path} from queue"
+            delay checkQueue()
 
 checkQueue()
 

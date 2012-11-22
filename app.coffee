@@ -40,7 +40,7 @@ checkQueue = () ->
         extractTar.stderr.on 'data', (data) ->
           console.log data.toString()
         extractTar.on 'exit', (code) ->
-          console.error "Tar process failed with code: #{code}" if code > 0
+          return console.error "Tar process failed with code: #{code}" if code > 0
           request.post 'http://localhost:80/jsonrpc',
             json: xbmcmessage 'ntor finished!: ', path.basename item.path
           request.post { url: "#{ntorUrl}/removeFromQueue", json: item }, (err, res, body ) ->

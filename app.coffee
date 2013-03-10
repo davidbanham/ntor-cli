@@ -74,10 +74,18 @@ messenger.on 'data', (item, length) ->
     socket.emit('progress', {name: item.name, totalDown: item.totalDown, percentDown: item.percentDown})
     lastPercentage = item.percentDown.split('.')[0]
 
-xbmcmessage = (title, message) ->
-  id: '1'
-  jsonrpc: '2.0'
-  method: 'GUI.ShowNotification'
-  params:
-    title: title
-    message: message
+if conf.xbmc.enabled
+  messenger.on 'start', (item) ->
+    xbmcMessage "ntor - Download started", item.title if conf.xbmc
+  messenger.on 'finish', (item) ->
+    xbmcMessage "ntor - Download complete!", item.title if conf.xbmc
+
+xbmcMessage = (title, message) ->
+  request.post "http://#{conf.xbmc.host}:#{conf.xbmc.port}/jsonrpc",
+    json:
+      id: '1'
+      jsonrpc: '2.0'
+      method: 'GUI.ShowNotification'
+      params:
+        title: title
+        message: message

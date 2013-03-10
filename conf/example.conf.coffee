@@ -5,3 +5,7 @@ module.exports =
     domain: "ntor.example.com"
   dl:
     incoming: "/home/pi/incoming/"
+  xbmc:
+    enabled: false
+    host: "localhost"
+    port: 80

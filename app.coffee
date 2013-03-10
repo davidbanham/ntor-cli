@@ -1,7 +1,6 @@
 conf = require './conf/conf.coffee'
 request = require 'request'
 fs = require 'fs'
-mkdirp = require 'mkdirp'
 tar = require 'tar'
 cookie = require 'cookie'
 io = require 'socket.io-client'

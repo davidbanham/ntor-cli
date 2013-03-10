@@ -71,7 +71,7 @@ messenger.on 'data', (item, length) ->
   item.percentDown = (item.totalDown / item.size * 100).toFixed(2)
   if item.percentDown.split('.')[0] != item.lastPercentage
     socket.emit('progress', {name: item.name, totalDown: item.totalDown, percentDown: item.percentDown})
-    lastPercentage = item.percentDown.split('.')[0]
+    item.lastPercentage = item.percentDown.split('.')[0]
 
 if conf.xbmc.enabled
   messenger.on 'start', (item) ->

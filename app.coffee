@@ -1,51 +1,67 @@
 conf = require './conf/conf.coffee'
 request = require 'request'
-querystring = require 'querystring'
-zlib = require 'zlib'
-path = require 'path'
 fs = require 'fs'
 mkdirp = require 'mkdirp'
 tar = require 'tar'
-spawn = require('child_process').spawn
-lock = false
+cookie = require 'cookie'
+io = require 'socket.io-client'
+dlProcs = {}
+queue = []
+socket = null
 
-ntorUrl = "https://#{encodeURIComponent conf.ntor.username}:#{encodeURIComponent conf.ntor.password}@#{conf.ntor.domain}"
+authUrl = "https://#{encodeURIComponent conf.ntor.username}:#{encodeURIComponent conf.ntor.password}@#{conf.ntor.domain}"
+ntorUrl = "https://#{conf.ntor.domain}"
+
+request "#{authUrl}/queue", (err, res, body) ->
+  cook = cookie.parse res.headers['set-cookie'].toString()
+  sessu = cook['ntor.sid']
+  connectSocket(sessu)
 
 console.log "Ntor client started"
 
-checkQueue = () ->
-  return if lock
-  lock = true
-  request "#{ntorUrl}/showQueue", (err, res, body) ->
+connectSocket = (sessu) ->
+  
+  socket = io.connect "https://"+conf.ntor.domain+"?sessu="+sessu
+
+  socket.on 'connect', () ->
+    socket.on 'queueItem', (data) ->
+      console.log "queueItem recieved", data
+      if data.action == 'delete' && dlProcs[data.path]
+        console.log "Item in progress deleted from queue, ending.", data
+        dlProcs[data.path].end()
+        delete dlProcs[data.path]
+      updateQueue()
+    console.log "Socket connected"
+    updateQueue()
+     
+  socket.on 'error', (err) ->
+    console.log "Socket error", err
+
+grab = (item) ->
+  item.totalDown = 0
+  lastPercentage = 0
+  if dlProcs[item.path]
+    console.log "Grab already in progress", item
+    return null
+  req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}").pipe(tar.Extract({ path: conf.dl.incoming }))
+  dlProcs[item.path] = req
+  req.on 'data', (data) ->
+    item.totalDown += data.length
+    item.percentDown = (item.totalDown / item.size * 100).toFixed(2)
+    if item.percentDown.split('.')[0] != lastPercentage
+      socket.emit('progress', {name: item.name, totalDown: item.totalDown, percentDown: item.percentDown})
+      lastPercentage = item.percentDown.split('.')[0]
+  req.on 'end', () ->
+    remove item
+    delete dlProcs[item.path]
+    updateQueue()
+    
+updateQueue = () ->
+  request "#{ntorUrl}/queue", (err, res, body) ->
+    console.log err if err?
     queue = JSON.parse body
-    for item in queue
-      target = item if item.claimed == false
-      break
-    return lock = false if !target?
-    console.log "Target is #{target.path}"
-    target.claimed = true
-    request.post { url: "#{ntorUrl}/claimItem", json: target }, (err, res, item) ->
-      filePath = path.dirname item.path
-      mkdirp.sync "#{conf.dl.incoming}/#{filePath}"
-      fd = fs.createWriteStream "#{__dirname}/dl.tar"
-      request.post 'http://localhost:80/jsonrpc',
-        json: xbmcmessage 'ntor downloading: ', path.basename item.path
-      grabTar = request.get("#{ntorUrl}/tar?path=#{item.path}").pipe fd
-      grabTar.on 'close', () ->
-        request.post 'http://localhost:80/jsonrpc',
-          json: xbmcmessage 'ntor extracting: ', path.basename item.path
-        extractTar = spawn "tar", ["xf", "#{__dirname}/dl.tar"], {cwd: conf.dl.incoming}
-        extractTar.stdout.on 'data', (data) ->
-          console.log data.toString()
-        extractTar.stderr.on 'data', (data) ->
-          console.log data.toString()
-        extractTar.on 'exit', (code) ->
-          return console.error "Tar process failed with code: #{code}" if code > 0
-          request.post 'http://localhost:80/jsonrpc',
-            json: xbmcmessage 'ntor finished!: ', path.basename item.path
-          request.post { url: "#{ntorUrl}/removeFromQueue", json: item }, (err, res, body ) ->
-            console.log "Removed #{item.path} from queue"
-            lock = false
+    console.log "queue length is ", queue.length
+    grab queue[0] if queue[0]?
 
 xbmcmessage = (title, message) ->
   id: '1'
@@ -54,7 +70,3 @@ xbmcmessage = (title, message) ->
   params:
     title: title
     message: message
-
-checkQueue()
-
-setInterval checkQueue, 15*1000

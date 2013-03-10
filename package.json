@@ -1,14 +1,16 @@
 {
-  "name": "ntor_client",
+  "name": "ntor-client",
   "version": "0.0.0",
   "description": "Client to automatically download queued files from ntor",
   "main": "wrapper.js",
   "dependencies": {
     "mkdirp": "~0.3.4",
-    "request": "~2.12.0",
     "tar": "~0.1.13",
     "coffee-script": "~1.4.0",
-    "forever": "~0.10.0"
+    "forever": "~0.10.0",
+    "socket.io-client": "~0.9.11",
+    "request": "~2.14.0",
+    "cookie": "0.0.5"
   },
   "devDependencies": {},
   "scripts": {

@@ -5,6 +5,8 @@ mkdirp = require 'mkdirp'
 tar = require 'tar'
 cookie = require 'cookie'
 io = require 'socket.io-client'
+EventEmitter = require('events').EventEmitter
+messenger = new EventEmitter
 dlProcs = {}
 queue = []
 socket = null
@@ -37,31 +39,40 @@ connectSocket = (sessu) ->
   socket.on 'error', (err) ->
     console.log "Socket error", err
 
-grab = (item) ->
-  item.totalDown = 0
-  lastPercentage = 0
-  if dlProcs[item.path]
-    console.log "Grab already in progress", item
-    return null
-  req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}").pipe(tar.Extract({ path: conf.dl.incoming }))
-  dlProcs[item.path] = req
-  req.on 'data', (data) ->
-    item.totalDown += data.length
-    item.percentDown = (item.totalDown / item.size * 100).toFixed(2)
-    if item.percentDown.split('.')[0] != lastPercentage
-      socket.emit('progress', {name: item.name, totalDown: item.totalDown, percentDown: item.percentDown})
-      lastPercentage = item.percentDown.split('.')[0]
-  req.on 'end', () ->
-    remove item
-    delete dlProcs[item.path]
-    updateQueue()
-    
 updateQueue = () ->
   request "#{ntorUrl}/queue", (err, res, body) ->
     console.log err if err?
     queue = JSON.parse body
     console.log "queue length is ", queue.length
     grab queue[0] if queue[0]?
+
+grab = (item) ->
+  if dlProcs[item.path]
+    console.log "Grab already in progress", item
+    return null
+  item.totalDown = 0
+  item.lastPercentage = 0
+  req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}").pipe(tar.Extract({ path: conf.dl.incoming }))
+  item.req = req
+  messenger.emit "start", item
+  req.on 'data', (data) ->
+    messenger.emit 'data', item, data.length
+  req.on 'end', () ->
+    messenger.emit "finish", item
+    req = request.post "#{ntorUrl}/queue/remove?path=#{item.path}", (err, res, body) ->
+      console.log "Error removing queue item", err if err?
+      updateQueue()
+
+messenger.on 'start', (item) ->
+  dlProcs[item.path] = item.req
+messenger.on 'finish', (item) ->
+  delete dlProcs[item.path]
+messenger.on 'data', (item, length) ->
+  item.totalDown += length
+  item.percentDown = (item.totalDown / item.size * 100).toFixed(2)
+  if item.percentDown.split('.')[0] != item.lastPercentage
+    socket.emit('progress', {name: item.name, totalDown: item.totalDown, percentDown: item.percentDown})
+    lastPercentage = item.percentDown.split('.')[0]
 
 xbmcmessage = (title, message) ->
   id: '1'

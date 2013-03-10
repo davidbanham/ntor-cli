@@ -1,5 +1,5 @@
 {
-  "name": "ntor-client",
+  "name": "ntor-cli",
   "version": "0.0.0",
   "description": "Client to automatically download queued files from ntor",
   "main": "wrapper.js",

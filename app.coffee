@@ -75,9 +75,9 @@ messenger.on 'data', (item, length) ->
 
 if conf.xbmc.enabled
   messenger.on 'start', (item) ->
-    xbmcMessage "ntor - Download started", item.title if conf.xbmc
+    xbmcMessage "ntor - Download started", item.name if conf.xbmc
   messenger.on 'finish', (item) ->
-    xbmcMessage "ntor - Download complete!", item.title if conf.xbmc
+    xbmcMessage "ntor - Download complete!", item.name if conf.xbmc
 
 xbmcMessage = (title, message) ->
   request.post "http://#{conf.xbmc.host}:#{conf.xbmc.port}/jsonrpc",

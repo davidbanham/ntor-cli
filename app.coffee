@@ -61,10 +61,13 @@ grab = (item) ->
   req.on 'data', (data) ->
     messenger.emit 'data', item, data.length
   req.on 'end', () ->
+    console.log "File complete!", item
     messenger.emit "finish", item
     req = request.post "#{ntorUrl}/queue/remove?path=#{item.path}", (err, res, body) ->
       console.log "Error removing queue item", err if err?
       updateQueue()
+  req.on 'error', (err) ->
+    console.log err
 
 messenger.on 'start', (item) ->
   dlProcs[item.path] = item.req

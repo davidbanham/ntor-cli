@@ -1,4 +1,5 @@
 conf = require './conf/conf.coffee'
+spawn = require('child_process').spawn
 request = require 'request'
 fs = require 'fs'
 tar = require 'tar'
@@ -51,8 +52,11 @@ grab = (item) ->
     return null
   item.totalDown = 0
   item.lastPercentage = 0
-  req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}").pipe(tar.Extract({ path: conf.dl.incoming }))
   item.req = req
+  untar = (spawn 'tar', ['--extract', '--directory', conf.dl.incoming, '--file', '-']).stdin if conf.systemTar
+  untar = tar.Extract({ path: conf.dl.incoming }) if !conf.systemTar
+  req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}")
+  req.pipe untar
   messenger.emit "start", item
   req.on 'data', (data) ->
     messenger.emit 'data', item, data.length

@@ -9,3 +9,4 @@ module.exports =
     enabled: false
     host: "localhost"
     port: 80
+  systemTar: true

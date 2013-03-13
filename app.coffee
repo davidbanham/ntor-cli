@@ -63,8 +63,7 @@ grab = (item) ->
   req.on 'end', () ->
     console.log "File complete!", item
     messenger.emit "finish", item
-    req = request.post "#{ntorUrl}/queue/remove?path=#{item.path}", (err, res, body) ->
-      console.log "Error removing queue item", err if err?
+    request.post {url: "#{ntorUrl}/queue/remove", json: true, body: {path: item.path}}, (err, res, body) ->
       updateQueue()
   req.on 'error', (err) ->
     console.log err

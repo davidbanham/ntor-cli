@@ -55,18 +55,29 @@ grab = (item) ->
   item.req = req
   untar = (spawn 'tar', ['--extract', '--directory', conf.dl.incoming, '--file', '-']).stdin if conf.systemTar
   untar = tar.Extract({ path: conf.dl.incoming }) if !conf.systemTar
-  req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}")
-  req.pipe untar
+  #req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}")
+  req = spawn 'bash', ["-c", "curl --insecure #{authUrl}/tar?path=#{encodeURIComponent item.path} | tar --extract --directory #{conf.dl.incoming} --file -"]
+  #req.pipe untar
   messenger.emit "start", item
-  req.on 'data', (data) ->
-    messenger.emit 'data', item, data.length
-  req.on 'end', () ->
+  req.on 'error', (data) ->
+    console.log "error", data.toString()
+  req.stdout.on 'data', (data) ->
+    console.log "stdout", data.toString()
+  req.stderr.on 'data', (data) ->
+    console.log "stderr", data.toString().split(/\s+/)
+  req.on 'end', (code) ->
     console.log "File complete!", item
-    messenger.emit "finish", item
     request.post {url: "#{ntorUrl}/queue/remove", json: true, body: {path: item.path}}, (err, res, body) ->
       updateQueue()
-  req.on 'error', (err) ->
-    console.log err
+  #req.on 'data', (data) ->
+  #  messenger.emit 'data', item, data.length
+  #req.on 'end', () ->
+  #  console.log "File complete!", item
+  #  messenger.emit "finish", item
+  #  request.post {url: "#{ntorUrl}/queue/remove", json: true, body: {path: item.path}}, (err, res, body) ->
+  #    updateQueue()
+  #req.on 'error', (err) ->
+  #  console.log err
 
 messenger.on 'start', (item) ->
   dlProcs[item.path] = item.req

@@ -52,12 +52,12 @@ grab = (item) ->
     return null
   item.totalDown = 0
   item.lastPercentage = 0
-  item.req = req
   untar = (spawn 'tar', ['--extract', '--directory', conf.dl.incoming, '--file', '-']).stdin if conf.systemTar
   untar = tar.Extract({ path: conf.dl.incoming }) if !conf.systemTar
   #req = request.get("#{ntorUrl}/tar?path=#{encodeURIComponent item.path}")
   req = spawn 'bash', ["-c", "curl --insecure #{authUrl}/tar?path=#{encodeURIComponent item.path} | tar --extract --directory #{conf.dl.incoming} --file -"]
   #req.pipe untar
+  item.req = req
   messenger.emit "start", item
   req.on 'error', (data) ->
     console.log "error", data.toString()
